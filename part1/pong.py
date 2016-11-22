@@ -6,12 +6,12 @@
 	- assignment 4 link -> http://slazebni.cs.illinois.edu/fall16/assignment4.html
 '''
 
-import pygame, sys
+import pygame, sys, random
 from pygame.locals import *
 
 # Number of frames per second
 # Change this value to speed up or slow down your game
-FPS = 200
+FPS = 20
 
 #Global Variables to be used through our program
 
@@ -54,20 +54,35 @@ def moveBall(ball, ballDirX, ballDirY):
 #Checks for a collision with a wall, and 'bounces' ball off it.
 #Returns new direction
 def checkEdgeCollision(ball, ballDirX, ballDirY):
-    if ball.top == (LINETHICKNESS) or ball.bottom == (WINDOWHEIGHT - LINETHICKNESS):
+    if ball.top < LINETHICKNESS or ball.bottom > (WINDOWHEIGHT - LINETHICKNESS):
+        if ball.top < LINETHICKNESS:
+            ball.y = 0
+        else: 
+            ball.y = (WINDOWHEIGHT - 2 * LINETHICKNESS)
         ballDirY = ballDirY * -1
-    if ball.left == (LINETHICKNESS) or ball.right == (WINDOWWIDTH - LINETHICKNESS):
+    if ball.left < (LINETHICKNESS):
+        ball.x = LINETHICKNESS
         ballDirX = ballDirX * -1
     return ballDirX, ballDirY
 
 #Checks is the ball has hit a paddle, and 'bounces' ball off it.     
-def checkHitBall(ball, paddle1, paddle2, ballDirX):
-    if ballDirX == -1 and paddle1.right == ball.left and paddle1.top < ball.top and paddle1.bottom > ball.bottom:
-        return -1
-    elif ballDirX == 1 and paddle2.left == ball.right and paddle2.top < ball.top and paddle2.bottom > ball.bottom:
-        return -1
-    else: return 1
+def checkPaddleHit(ball, paddle, ballDirX):
+    if ballDirX > 0 and ball.right > (WINDOWWIDTH - LINETHICKNESS) and paddle.top < ball.top and paddle.bottom > ball.bottom:
+        return True 
+    else: 
+        return False
 
+def gameOver(ball):
+    if ball.x > WINDOWWIDTH:
+        return True
+
+def movePaddle(paddle, paddleMovement):
+    if (paddleMovement < (1.0/3)): # move down
+        if (paddle.bottom + 0.04 * WINDOWHEIGHT * (2.0/FPS)) < WINDOWHEIGHT:
+            paddle.y += 0.04 * WINDOWHEIGHT * (2.0/FPS)
+    elif(paddleMovement < (2.0/3)): # move up
+        if (paddle.top - 0.04 * WINDOWHEIGHT * (2.0/FPS)) > 0:
+            paddle.y -= 0.04 * WINDOWHEIGHT * (2.0/FPS)
 #Main function
 def main():
     pygame.init()
@@ -84,9 +99,10 @@ def main():
     leftWallPosition = 0
     paddlePosition = (WINDOWHEIGHT - PADDLESIZE) /2
 
-    #Keeps track of ball direction
-    ballDirX = -1 ## -1 = left 1 = right
-    ballDirY = -1 ## -1 = up 1 = down
+    # Keeps track of ball direction
+    # 1/FPS scalar to account for the FPS
+    ballDirX = 0.03 * WINDOWWIDTH * (2.0/FPS)
+    ballDirY = 0.01 * WINDOWHEIGHT * (2.0/FPS)
 
     #Creates Rectangles for ball and paddles.
     leftWall = pygame.Rect(PADDLEOFFSET, leftWallPosition, LINETHICKNESS, WINDOWHEIGHT)
@@ -98,29 +114,46 @@ def main():
     drawPaddle(paddle)
     drawBall(ball)
 
-    pygame.mouse.set_visible(0) # make cursor invisible
-
     while True: #main game loop
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
-            # mouse movement commands
-            elif event.type == MOUSEMOTION:
-                mousex, mousey = event.pos
-                paddle.y = mousey
 
         drawArena()
         pygame.draw.rect(DISPLAYSURF, BLACK, leftWall)
         drawPaddle(paddle)
         drawBall(ball)
 
+        # if the paddle is hit, set the new ball velocities based on randomness
+        paddleHit = checkPaddleHit(ball, paddle, ballDirX)
+        if paddleHit:
+            V = ((random.random() * 0.06 * WINDOWHEIGHT) - 0.03 * WINDOWHEIGHT) * (2.0/FPS)
+            ballDirY = ballDirY + V
+            U = ((random.random() * 0.03 * WINDOWWIDTH) - 0.15 * WINDOWWIDTH) * (2.0/FPS)
+            while abs(ballDirX * -1 + U) < 0.03:
+                U = ((random.random() * 0.03 * WINDOWWIDTH) - 0.15 * WINDOWWIDTH) * (2.0/FPS)
+            ballDirX = ballDirX * -1 + U
+        else:
+            if (gameOver(ball)):
+                break
+            ballDirX, ballDirY = checkEdgeCollision(ball, ballDirX, ballDirY)
         ball = moveBall(ball, ballDirX, ballDirY)
-        ballDirX, ballDirY = checkEdgeCollision(ball, ballDirX, ballDirY)
-        ballDirX = ballDirX * checkHitBall(ball, leftWall, paddle, ballDirX)
+
+        # randomly move the paddle for now
+        paddleMovement = random.random()
+        movePaddle(paddle, paddleMovement)
 
         pygame.display.update()
         FPSCLOCK.tick(FPS)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+        drawArena()
+        pygame.display.update()
 
 if __name__=='__main__':
     main()
