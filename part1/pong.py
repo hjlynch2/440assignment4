@@ -7,6 +7,7 @@
 '''
 
 import pygame, sys, random
+import math
 from pygame.locals import *
 
 # Number of frames per second
@@ -23,6 +24,7 @@ PADDLEOFFSET = 0
 
 # Set up the colours
 BLACK     = (0  ,0  ,0  )
+RED       = (255,0  ,0  )
 WHITE     = (255,255,255)
 
 #Draws the arena the game will be played in. 
@@ -43,7 +45,7 @@ def drawPaddle(paddle):
 
 #draws the ball
 def drawBall(ball):
-    pygame.draw.rect(DISPLAYSURF, BLACK, ball)
+    pygame.draw.rect(DISPLAYSURF, RED, ball)
 
 #moves the ball returns new position
 def moveBall(ball, ballDirX, ballDirY):
@@ -83,6 +85,33 @@ def movePaddle(paddle, paddleMovement):
     elif(paddleMovement < (2.0/3)): # move up
         if (paddle.top - 0.04 * WINDOWHEIGHT * (2.0/FPS)) > 0:
             paddle.y -= 0.04 * WINDOWHEIGHT * (2.0/FPS)
+
+
+#Helper functions for state detection
+def getBallXState(ballDirX):
+    if ballDirX < 0:
+        return -1
+    else:
+        return 1
+
+def getBallYState(ballDirY):
+    if abs(ballDirY) < 0.015:
+        return 0
+    elif ballDirY < 0:
+        return -1
+    else:
+        return 1
+
+def getPaddleLocation(paddle):
+    paddle_y = float(paddle.y)/400
+    return math.floor((paddle_y * 12)/(0.8))
+
+def getStateCoords(ball):
+    gridX = math.floor(ball.x/33.333333)
+    gridY = math.floor(ball.y/33.333333)
+    return gridX + 12 * gridY
+
+
 #Main function
 def main():
     pygame.init()
