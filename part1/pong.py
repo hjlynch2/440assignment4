@@ -12,6 +12,7 @@ import time
 from random import randint
 from pygame.locals import *
 from state import state
+from copy import deepcopy
 
 # Number of frames per second
 # Change this value to speed up or slow down your game
@@ -22,6 +23,10 @@ GO_NOWHERE = 0
 GO_UP = 1
 GO_DOWN = 2
 ACTIONS = (GO_NOWHERE, GO_UP, GO_DOWN)
+disc_cur_state = (0,0,0,0,0,0)
+disc_prev_state = disc_prev_state
+prev_reward = 0
+game = 0
 
 #Global Variables to be used through our program
 
@@ -43,8 +48,6 @@ WHITE     = (255,255,255)
 FPSCLOCK = pygame.time.Clock()
 DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH,WINDOWHEIGHT)) 
 pygame.display.set_caption('Pong')
-
-LEARNING_RATE_CONST = 0.2
 
 #Draws the arena the game will be played in. 
 def drawArena():
@@ -125,6 +128,13 @@ def checkHit(cur_state):
     else: 
         return False
 
+def getReward(cur_state):
+    if checkHit(cur_state):
+        return 1
+    elif checkGameOver(cur_state):
+        return -1
+    return 0
+
 def gameOver(ball):
     if ball.x > WINDOWWIDTH:
         return True
@@ -170,14 +180,6 @@ def getStateCoords(ball):
     gridX = math.floor(ball.x/33.333333)
     gridY = math.floor(ball.y/33.333333)
     return gridX + 12 * gridY
-
-def getState(ball, ballDirX, ballDirY, paddle):
-    ball_x = getXCoord(ball)
-    ball_y = getYCoord(ball)
-    velocity_x = getBallXState(ballDirX)
-    velocity_y = getBallYState(ballDirY)
-    paddle_y = getPaddleLocation(paddle.y)
-    return (ball_x, ball_y, velocity_x, velocity_y, paddle_y)
 
 def getXYLines():
     sizeOfState = WINDOWWIDTH / 12.0
@@ -259,64 +261,53 @@ def exploration_function(cur_state):
         return GO_NOWHERE
 
 # pass cur_state w/out action attached to it
-def QLearning(cur_state, prev_state, reward, reward_signal):
-    if isTerminal(cur_state):
-        Q_dict[prev_state[0:5]] = reward_signal
-        return None
-    if not cur_state is None:
-        action = prev_state[5]
-        N_dict[prev_state] = N_dict[prev_state] + 1
+def updateQVal(prev_state, reward):
+    if not prev_state is None:
+        try:
+            N_dict[prev_state] += 1
+        except Exception:
+            N_dict[prev_state] = 1
 
-        learning_rate = LEARNING_RATE_CONST / (LEARNING_RATE_CONST + N_dict[prev_state])
-        learning_term = learning_rate(N_dict[prev_state])
-        discount_factor = 0.3 # change this later
-        maxQ = getMaxQ(cur_state) * discount_factor
-        Qterm = reward + maxQ - Q_dict[prev_state]
-
-        Q_dict[prev_state] = Q_dict[prev_state] + learning_term * Qterm
-
-        # keep this part consistent????
-        prev_state = cur_state
-        reward = getNewReward() # dont know how this works
-        action = getNextAction(cur_state) # this is the f(u, n) function from the text book
-
-        return action
-
-def getMaxQ(cur_state):
-    go_up_state = cur_state + (GO_UP,) #Equivalent to (s, a')
-    go_down_state = cur_state + (GO_DOWN,)
-    go_nowhere_state = cur_state + (GO_NOWHERE,)
-
-    up_utility = 0
-    down_utility = 0
-    nowhere_utility = 0
-
-    try:
-        up_utility = Q_dict[go_up_state] 
-    except Exception as e:
+        #Go up
+        go_up_state = prev_state + (GO_UP,) #Equivalent to (s, a')
         up_utility = 0
 
-    try:
-        down_utility = Q_dict[go_down_state] 
-    except Exception as e:
+        try:
+            up_utility = Q_dict[go_up_state] 
+        except Exception:
+            up_utility = 0
+
+        #Go down
+        go_down_state = prev_state + (GO_DOWN,)
         down_utility = 0
 
-    try:
-        nowhere_utility = Q_dict[go_nowhere_state] 
-    except Exception as e:
+        try:
+            down_utility = Q_dict[go_down_state] 
+        except Exception:
+            down_utility = 0
+
+        #Do nothing
+        go_nowhere_state = prev_state + (GO_NOWHERE,)
         nowhere_utility = 0
 
-    return max(up_utility, down_utility, nowhere_utility)
+        try:
+            nowhere_utility = Q_dict[go_nowhere_state] 
+        except Exception:
+            nowhere_utility = 0
+
+        max_utility = max(up_utility, down_utility, nowhere_utility)
+
+        discount_factor = 0.5
+        lr_const = 0.5
+        learning_rate = lr_const/(lr_const + N_dict[prev_state])
+
+        first_term = learning_rate * N_dict[prev_state]
+        second_term = reward + discount_factor * max_utility - Q_dict[prev_state]
+        Q_dict[prev_state] += first_term * second_term
 
 # change this later
 def isTerminal(cur_state):
     return False
-
-def getNewReward():
-    return 1
-
-def getNextAction():
-    return GO_NOWHERE
 
 def playGraphicGame():
     global DISPLAYSURF
@@ -390,46 +381,57 @@ def playGame():
     #Initiate variable and set starting positions
     #any future changes made within rectangles
     paddle_height = 0.2 
-    ballX = 0.5
-    ballY = 0.5
-    leftWallPosition = 0.0
-    paddle_y = 0.5-paddle_height/2
+    global disc_cur_state
+    global disc_prev_state
+    global prev_reward
+    global game
 
-    # Keeps track of ball direction
-    ballDirX = 0.03
-    ballDirY = 0.01
+    cont_cur_state = state(0.5, 0.5, 0.03, 0.01, 0.5 - paddle_height/2)
+    disc_cur_state = cont_cur_state.getState()
+    disc_prev_state = None
 
-    cur_state = state(ballX, ballY, ballDirX, ballDirY, paddle_y)
-
-    game = 0
     startTime = time.time()
 
-    while True and game < 100000: #main game loop
+    while True and game < 1000: #main game loop
+
+        disc_prev_state = copy.deepcopy(disc_cur_state)
+        next_action = exploration_function(cont_cur_state.getState())
+        disc_cur_state = cont_cur_state.getState() + (next_action, )
+        paddle_move = 0
+        if next_action == 1:
+            paddle_move = 0.04
+        elif next_action == 2:
+            paddle_move = -0.04
+
+        cont_cur_state.ball_x = cont_cur_state.ball_x + cont_cur_state.v_x
+        cont_cur_state.ball_y = cont_cur_state.ball_y + cont_cur_state.v_y
+
+        if(cont_cur_state.paddle_y + paddle_move < 0.8 and cont_cur_state.paddle_y + paddle_move > 0):
+            cont_cur_state.paddle_y = cont_cur_state.paddle_y + paddle_move   
 
         # if the paddle is hit, set the new ball velocities based on randomness
-        paddleHit = checkHit(cur_state)
+        paddleHit = checkHit(cont_cur_state)
 
         if paddleHit:
-            cur_state.ball_x = 2 - cur_state.ball_x
+            cont_cur_state.ball_x = 2 - cont_cur_state.ball_x
             V = (random.random() * 0.03) - 0.015
-            while abs(cur_state.ball_y + V) > 1: 
+            while abs(cont_cur_state.ball_y + V) > 1: 
                 V = (random.random() * 0.03) - 0.015
-            cur_state.v_y = cur_state.v_y + V
+            cont_cur_state.v_y = cont_cur_state.v_y + V
             U = (random.random() * 0.06) - 0.03
-            while abs(cur_state.ball_x * -1 + U) < 0.03 and abs(cur_state.ball_x * -1 + U) > 1:
+            while abs(cont_cur_state.ball_x * -1 + U) < 0.03 and abs(cont_cur_state.ball_x * -1 + U) > 1:
                 U = (random.random() * 0.03 ) - 0.03
-            cur_state.v_x = cur_state.v_x * -1 + U
+            cont_cur_state.v_x = cont_cur_state.v_x * -1 + U
         else:
-            if (checkGameOver(cur_state)):
-                #playGame()
+            if (checkGameOver(cont_cur_state)):
+                updateQVal(disc_prev_state, -1)
                 game += 1
-            cur_state = checkWallCollision(cur_state)
+                playGame()
+            cont_cur_state = checkWallCollision(cont_cur_state)
 
-        cur_state.ball_x = cur_state.ball_x + cur_state.v_x
-        cur_state.ball_y = cur_state.ball_y + cur_state.v_y
-
-        if(cur_state.paddle_y < 0.8):
-            cur_state.paddle_y = cur_state.paddle_y + 0.015 # change this later, this is where the machine learning comes in
+        prev_reward = getReward(cont_cur_state)
+        
+        updateQVal(disc_prev_state, prev_reward)
 
     endTime = time.time()
     print 'time taken: ' + str(endTime - startTime)
