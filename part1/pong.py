@@ -37,6 +37,12 @@ BLACK     = (0  ,0  ,0  )
 RED       = (255,0  ,0  )
 WHITE     = (255,255,255)
 
+# initialization of the game variables
+FPSCLOCK = pygame.time.Clock()
+DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH,WINDOWHEIGHT)) 
+pygame.display.set_caption('Pong')
+
+LEARNING_RATE_CONST = 0.2
 
 #Draws the arena the game will be played in. 
 def drawArena():
@@ -58,10 +64,20 @@ def drawPaddle(paddle):
 def drawBall(ball):
     pygame.draw.rect(DISPLAYSURF, RED, ball)
 
-#moves the ball returns new position
-def moveBall(ball, ballDirX, ballDirY):
-    ball.x += ballDirX
-    ball.y += ballDirY
+# draws separating lines
+def drawLines(lines):
+    # draw horizontal lines
+    for line in lines:
+        pygame.draw.line(DISPLAYSURF, BLACK, (0, line), (WINDOWWIDTH, line), 1)
+
+    # draw vertical lines
+    for line in lines:
+        pygame.draw.line(DISPLAYSURF, BLACK, (line, 0), (line, WINDOWHEIGHT), 1)
+
+# moves the ball, passes in new x and y position
+def moveBall(ball, ballX, ballY):
+    ball.x = ballX
+    ball.y = ballY
     return ball
 
 #Checks for a collision with a wall, and 'bounces' ball off it.
@@ -114,7 +130,7 @@ def getBallYState(ballDirY):
         return 1
 
 def getPaddleLocation(paddle_y_coord):
-    paddle_y = float(paddle_y_coord)/400
+    paddle_y = float(paddle_y_coord)/WINDOWHEIGHT
     return int(math.floor((paddle_y * 12)/(0.8)))
 
 def getXCoord(ball):
@@ -135,6 +151,15 @@ def getState(ball, ballDirX, ballDirY, paddle):
     velocity_y = getBallYState(ballDirY)
     paddle_y = getPaddleLocation(paddle.y)
     return (ball_x, ball_y, velocity_x, velocity_y, paddle_y)
+
+def getXYLines():
+    sizeOfState = WINDOWWIDTH / 12.0
+    curr_line = 0
+    lines = []
+    for i in range(0,11):
+        curr_line = curr_line + sizeOfState
+        lines.append(curr_line)
+    return lines
 
 
 ##### Exploration Function #####
@@ -206,21 +231,75 @@ def exploration_function(cur_state):
     elif best_utility == nowhere_utility:
         return GO_NOWHERE
 
+# pass cur_state w/out action attached to it
+def QLearning(cur_state, prev_state, reward, reward_signal):
+    if isTerminal(cur_state):
+        Q_dict[prev_state[0:5]] = reward_signal
+        return None
+    if not cur_state is None:
+        action = prev_state[5]
+        N_dict[prev_state] = N_dict[prev_state] + 1
 
-#Main function
-def main():
-    pygame.init()
+        learning_rate = LEARNING_RATE_CONST / (LEARNING_RATE_CONST + N_dict[prev_state])
+        learning_term = learning_rate(N_dict[prev_state])
+        discount_factor = 0.3 # change this later
+        maxQ = getMaxQ(cur_state) * discount_factor
+        Qterm = reward + maxQ - Q_dict[prev_state]
+
+        Q_dict[prev_state] = Q_dict[prev_state] + learning_term * Qterm
+
+        # keep this part consistent????
+        prev_state = cur_state
+        reward = getNewReward() # dont know how this works
+        action = getNextAction(cur_state) # this is the f(u, n) function from the text book
+
+        return action
+
+def getMaxQ(cur_state):
+    go_up_state = cur_state + (GO_UP,) #Equivalent to (s, a')
+    go_down_state = cur_state + (GO_DOWN,)
+    go_nowhere_state = cur_state + (GO_NOWHERE,)
+
+    up_utility = 0
+    down_utility = 0
+    nowhere_utility = 0
+
+    try:
+        up_utility = Q_dict[go_up_state] 
+    except Exception as e:
+        up_utility = 0
+
+    try:
+        down_utility = Q_dict[go_down_state] 
+    except Exception as e:
+        down_utility = 0
+
+    try:
+        nowhere_utility = Q_dict[go_nowhere_state] 
+    except Exception as e:
+        nowhere_utility = 0
+
+    return max(up_utility, down_utility, nowhere_utility)
+
+# change this later
+def isTerminal(cur_state):
+    return False
+
+def getNewReward():
+    return 1
+
+def getNextAction():
+    return GO_NOWHERE
+
+def playGame():
     global DISPLAYSURF
-
-    FPSCLOCK = pygame.time.Clock()
-    DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH,WINDOWHEIGHT)) 
-    pygame.display.set_caption('Pong')
+    global FPSCLOCK
 
     #Initiate variable and set starting positions
     #any future changes made within rectangles
     ballX = WINDOWWIDTH/2 - LINETHICKNESS/2
     ballY = WINDOWHEIGHT/2 - LINETHICKNESS/2
-    leftWallPosition = 0
+    leftWallPosition = 0.0
     paddlePosition = (WINDOWHEIGHT - PADDLESIZE) /2
 
     # Keeps track of ball direction
@@ -233,10 +312,13 @@ def main():
     paddle = pygame.Rect(WINDOWWIDTH - PADDLEOFFSET - LINETHICKNESS, paddlePosition, LINETHICKNESS, PADDLESIZE)
     ball = pygame.Rect(ballX, ballY, LINETHICKNESS, LINETHICKNESS)
 
+    lines = getXYLines()
+
     #Draws the starting position of the Arena
     drawArena()
     drawPaddle(paddle)
     drawBall(ball)
+    drawLines(lines)
 
     while True: #main game loop
         for event in pygame.event.get():
@@ -248,6 +330,7 @@ def main():
         pygame.draw.rect(DISPLAYSURF, BLACK, leftWall)
         drawPaddle(paddle)
         drawBall(ball)
+        drawLines(lines)
 
         # if the paddle is hit, set the new ball velocities based on randomness
         paddleHit = checkPaddleHit(ball, paddle, ballDirX)
@@ -260,34 +343,27 @@ def main():
             ballDirX = ballDirX * -1 + U
         else:
             if (gameOver(ball)):
-                break
+                playGame()
             ballDirX, ballDirY = checkEdgeCollision(ball, ballDirX, ballDirY)
-        ball = moveBall(ball, ballDirX, ballDirY)
-
-
+        ballX = ballX + ballDirX
+        ballY = ballY + ballDirY
+        ball = moveBall(ball, ballX, ballY)
 
         state = getState(ball, ballDirX, ballDirY, paddle)
         next_action = exploration_function(state)
         
-
         # randomly move the paddle for now
         paddleMovement = random.random()
         movePaddle(paddle, paddleMovement)
 
-
-
-
-
         pygame.display.update()
         FPSCLOCK.tick(FPS)
 
-    while True:
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                pygame.quit()
-                sys.exit()
-        drawArena()
-        pygame.display.update()
+#Main function
+def main():
+    pygame.init()
+    global DISPLAYSURF
+    playGame()
 
 if __name__=='__main__':
     main()
