@@ -8,8 +8,10 @@
 
 import pygame, sys, random
 import math
+import time
 from random import randint
 from pygame.locals import *
+from state import state
 
 # Number of frames per second
 # Change this value to speed up or slow down your game
@@ -94,6 +96,19 @@ def checkEdgeCollision(ball, ballDirX, ballDirY):
         ballDirX = ballDirX * -1
     return ballDirX, ballDirY
 
+# non graphical check
+def checkWallCollision(cur_state):
+    if cur_state.ball_x < 0:
+        cur_state.ball_x = cur_state.ball_x * -1
+        cur_state.v_x = cur_state.v_x * -1
+    if cur_state.ball_y < 0:
+        cur_state.ball_y = cur_state.ball_y * -1
+        cur_state.v_y = cur_state.v_y * -1
+    if cur_state.ball_y > 1:
+        cur_state.ball_y = 2 - cur_state.ball_y
+        cur_state.v_y = cur_state.v_y * -1
+    return cur_state
+
 #Checks is the ball has hit a paddle, and 'bounces' ball off it.     
 def checkPaddleHit(ball, paddle, ballDirX):
     if ballDirX > 0 and ball.right > (WINDOWWIDTH - LINETHICKNESS) and paddle.top < ball.top and paddle.bottom > ball.bottom:
@@ -101,9 +116,21 @@ def checkPaddleHit(ball, paddle, ballDirX):
     else: 
         return False
 
+# non graphical check
+def checkHit(cur_state):
+    paddle_bot = cur_state.paddle_y + 0.2
+    if cur_state.v_x > 0 and cur_state.ball_x >= 1 and cur_state.ball_y >= cur_state.paddle_y and cur_state.ball_y <= paddle_bot:
+        #print 'PADDLE HIT'
+        return True 
+    else: 
+        return False
+
 def gameOver(ball):
     if ball.x > WINDOWWIDTH:
         return True
+
+def checkGameOver(cur_state):
+    return cur_state.ball_x > 1
 
 def movePaddle(paddle, paddleMovement):
     if (paddleMovement < (1.0/3)): # move down
@@ -291,7 +318,7 @@ def getNewReward():
 def getNextAction():
     return GO_NOWHERE
 
-def playGame():
+def playGraphicGame():
     global DISPLAYSURF
     global FPSCLOCK
 
@@ -359,10 +386,58 @@ def playGame():
         pygame.display.update()
         FPSCLOCK.tick(FPS)
 
+def playGame():
+    #Initiate variable and set starting positions
+    #any future changes made within rectangles
+    paddle_height = 0.2 
+    ballX = 0.5
+    ballY = 0.5
+    leftWallPosition = 0.0
+    paddle_y = 0.5-paddle_height/2
+
+    # Keeps track of ball direction
+    ballDirX = 0.03
+    ballDirY = 0.01
+
+    cur_state = state(ballX, ballY, ballDirX, ballDirY, paddle_y)
+
+    game = 0
+    startTime = time.time()
+
+    while True and game < 100000: #main game loop
+
+        # if the paddle is hit, set the new ball velocities based on randomness
+        paddleHit = checkHit(cur_state)
+
+        if paddleHit:
+            cur_state.ball_x = 2 - cur_state.ball_x
+            V = (random.random() * 0.03) - 0.015
+            while abs(cur_state.ball_y + V) > 1: 
+                V = (random.random() * 0.03) - 0.015
+            cur_state.v_y = cur_state.v_y + V
+            U = (random.random() * 0.06) - 0.03
+            while abs(cur_state.ball_x * -1 + U) < 0.03 and abs(cur_state.ball_x * -1 + U) > 1:
+                U = (random.random() * 0.03 ) - 0.03
+            cur_state.v_x = cur_state.v_x * -1 + U
+        else:
+            if (checkGameOver(cur_state)):
+                #playGame()
+                game += 1
+            cur_state = checkWallCollision(cur_state)
+
+        cur_state.ball_x = cur_state.ball_x + cur_state.v_x
+        cur_state.ball_y = cur_state.ball_y + cur_state.v_y
+
+        if(cur_state.paddle_y < 0.8):
+            cur_state.paddle_y = cur_state.paddle_y + 0.015 # change this later, this is where the machine learning comes in
+
+    endTime = time.time()
+    print 'time taken: ' + str(endTime - startTime)
+
 #Main function
 def main():
-    pygame.init()
-    global DISPLAYSURF
+    #pygame.init()
+    #playGraphicGame()
     playGame()
 
 if __name__=='__main__':
