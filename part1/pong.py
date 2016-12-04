@@ -194,8 +194,8 @@ def getXYLines():
 
 
 ##### Exploration Function #####
-NUMBER_EXPLORED_THRESHOLD = 5  #Ne in the lectures
-R_PLUS = 10 #R+ -> arbitrary value (modified utility)
+NUMBER_EXPLORED_THRESHOLD = 10  #Ne in the lectures
+R_PLUS = 0.5 #R+ -> arbitrary value (modified utility)
 
 """
 Return what action to take next
@@ -216,7 +216,7 @@ def exploration_function(cur_state):
         try:
             up_utility = Q_dict[go_up_state] 
         except Exception as e:
-            up_utility = R_PLUS
+            up_utility = 0
 
     #Go down
     go_down_state = cur_state + (GO_DOWN,)
@@ -232,7 +232,7 @@ def exploration_function(cur_state):
         try:
             down_utility = Q_dict[go_down_state] 
         except Exception as e:
-            down_utility = R_PLUS
+            down_utility = 0
 
     #Do nothing
     go_nowhere_state = cur_state + (GO_NOWHERE,)
@@ -248,7 +248,7 @@ def exploration_function(cur_state):
         try:
             nowhere_utility = Q_dict[go_nowhere_state] 
         except Exception as e:
-            nowhere_utility = R_PLUS
+            nowhere_utility = 0
 
     # Choose random direction when all the utilities are the same
     if up_utility == down_utility and down_utility == nowhere_utility:
@@ -299,8 +299,8 @@ def updateQVal(prev_state, reward):
 
         max_utility = max(up_utility, down_utility, nowhere_utility)
 
-        discount_factor = 0.5
-        lr_const = 0.5
+        discount_factor = 0.2
+        lr_const = 30
         learning_rate = lr_const/(lr_const + N_dict[prev_state])
 
         first_term = learning_rate * N_dict[prev_state]
@@ -401,6 +401,9 @@ def playGame():
 
     while True: #main game loop
 
+        if game > 4997:
+            print disc_cur_state
+
         disc_prev_state = deepcopy(disc_cur_state) + (0, )
         next_action = exploration_function(cont_cur_state.getState())
         disc_cur_state = cont_cur_state.getState() + (next_action, )
@@ -450,13 +453,18 @@ def playGame():
 def main():
     #pygame.init()
     #playGraphicGame()
-    for game in range(0,1000):
+    iterations = 5000
+    for game in range(0,iterations):
         playGame()
     bestPaddleHits = 0
+    avgPaddleHits = 0
+    i  = 0
     for paddleHits in paddleHitList:
-        #print paddleHits
         bestPaddleHits = max(bestPaddleHits, paddleHits)
-    print N_dict
+        if i > iterations - 100:
+            avgPaddleHits += paddleHits
+        i += 1
+    print 'avg paddle hits of last 100: ' + str(float(avgPaddleHits)/100)
     print 'best paddle hits: ' + str(bestPaddleHits)
 
 if __name__=='__main__':
