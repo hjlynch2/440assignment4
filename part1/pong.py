@@ -418,6 +418,7 @@ def playGame():
 
         # if the paddle is hit, set the new ball velocities based on randomness
         paddleHit = checkHit(cont_cur_state)
+        #print Q_dict
 
         if paddleHit:
             paddleHitList[game] += 1
@@ -430,26 +431,32 @@ def playGame():
             while abs(cont_cur_state.ball_x * -1 + U) < 0.03 and abs(cont_cur_state.ball_x * -1 + U) > 1:
                 U = (random.random() * 0.03 ) - 0.03
             cont_cur_state.v_x = cont_cur_state.v_x * -1 + U
+            updateQVal(disc_prev_state, 1)
         else:
-            if (checkGameOver(cont_cur_state)):
+            if getReward(cont_cur_state) == -1:
                 updateQVal(disc_prev_state, -1)
                 game += 1
                 break
+            else:
+                updateQVal(disc_prev_state, 0)
             cont_cur_state = checkWallCollision(cont_cur_state)
 
-        prev_reward = getReward(cont_cur_state)
+        #prev_reward = getReward(cont_cur_state)
+        #print prev_reward
         
-        updateQVal(disc_prev_state, prev_reward)
+        #updateQVal(disc_prev_state, prev_reward)
 
 #Main function
 def main():
     #pygame.init()
     #playGraphicGame()
-    for game in range(0,100000):
+    for game in range(0,1000):
         playGame()
     bestPaddleHits = 0
     for paddleHits in paddleHitList:
+        #print paddleHits
         bestPaddleHits = max(bestPaddleHits, paddleHits)
+    print N_dict
     print 'best paddle hits: ' + str(bestPaddleHits)
 
 if __name__=='__main__':
