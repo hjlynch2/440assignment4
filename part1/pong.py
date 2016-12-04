@@ -24,8 +24,10 @@ GO_UP = 1
 GO_DOWN = 2
 ACTIONS = (GO_NOWHERE, GO_UP, GO_DOWN)
 disc_cur_state = (0,0,0,0,0,0)
-disc_prev_state = disc_prev_state
+disc_prev_state = None
 prev_reward = 0
+gameLengths = []
+paddleHitList = []
 game = 0
 
 #Global Variables to be used through our program
@@ -302,7 +304,12 @@ def updateQVal(prev_state, reward):
         learning_rate = lr_const/(lr_const + N_dict[prev_state])
 
         first_term = learning_rate * N_dict[prev_state]
-        second_term = reward + discount_factor * max_utility - Q_dict[prev_state]
+        second_term = 0
+        try:
+            second_term = reward + discount_factor * max_utility - Q_dict[prev_state]
+        except Exception:
+            Q_dict[prev_state] = 0
+            second_term = reward + discount_factor * max_utility - Q_dict[prev_state]
         Q_dict[prev_state] += first_term * second_term
 
 # change this later
@@ -390,11 +397,11 @@ def playGame():
     disc_cur_state = cont_cur_state.getState()
     disc_prev_state = None
 
-    startTime = time.time()
+    paddleHitList.append(0)
 
-    while True and game < 1000: #main game loop
+    while True: #main game loop
 
-        disc_prev_state = copy.deepcopy(disc_cur_state)
+        disc_prev_state = deepcopy(disc_cur_state) + (0, )
         next_action = exploration_function(cont_cur_state.getState())
         disc_cur_state = cont_cur_state.getState() + (next_action, )
         paddle_move = 0
@@ -413,6 +420,7 @@ def playGame():
         paddleHit = checkHit(cont_cur_state)
 
         if paddleHit:
+            paddleHitList[game] += 1
             cont_cur_state.ball_x = 2 - cont_cur_state.ball_x
             V = (random.random() * 0.03) - 0.015
             while abs(cont_cur_state.ball_y + V) > 1: 
@@ -426,21 +434,23 @@ def playGame():
             if (checkGameOver(cont_cur_state)):
                 updateQVal(disc_prev_state, -1)
                 game += 1
-                playGame()
+                break
             cont_cur_state = checkWallCollision(cont_cur_state)
 
         prev_reward = getReward(cont_cur_state)
         
         updateQVal(disc_prev_state, prev_reward)
 
-    endTime = time.time()
-    print 'time taken: ' + str(endTime - startTime)
-
 #Main function
 def main():
     #pygame.init()
     #playGraphicGame()
-    playGame()
+    for game in range(0,100000):
+        playGame()
+    bestPaddleHits = 0
+    for paddleHits in paddleHitList:
+        bestPaddleHits = max(bestPaddleHits, paddleHits)
+    print 'best paddle hits: ' + str(bestPaddleHits)
 
 if __name__=='__main__':
     main()

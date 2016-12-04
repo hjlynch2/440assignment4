@@ -41,4 +41,4 @@ class state:
 	    return int(self.ball_x * 12)
 
 	def getYState(self):
-	    return int(self.ball_Y * 12)
+	    return int(self.ball_y * 12)
