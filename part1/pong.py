@@ -98,7 +98,7 @@ def exploration_function(cur_state):
 
     try:
         num_visited_up = N_dict[go_up_state]
-    except Exception as e:
+    except Exception:
         num_visited_up = 0
 
     if num_visited_up >= NUMBER_EXPLORED_THRESHOLD:
@@ -111,7 +111,7 @@ def exploration_function(cur_state):
 
     try:
         num_visited_down = N_dict[go_down_state]
-    except Exception as e:
+    except Exception:
         num_visited_down = 0
 
     if num_visited_down >= NUMBER_EXPLORED_THRESHOLD:
@@ -124,7 +124,7 @@ def exploration_function(cur_state):
 
     try:
         num_visited_nowhere = N_dict[go_nowhere_state]
-    except Exception as e:
+    except Exception:
         num_visited_nowhere = 0
 
     if num_visited_nowhere >= NUMBER_EXPLORED_THRESHOLD:
@@ -148,21 +148,14 @@ def QLearningAgent(cont_cur_state):
     global N_dict
     cur_state = cont_cur_state.getState()
     action = exploration_function(cur_state)
+    reward = 0
     if not disc_prev_state is None:
-        reward = 0
         if checkGameOver(cont_cur_state):
             reward  = -1
         elif checkHit(cont_cur_state):
-            #print 'reward = 1'
             reward = 1
-        try:
-            N_dict[disc_prev_state] += 1
-        except Exception:
-            N_dict[disc_prev_state] = 1      
         updateQ(cur_state)
-        prev_reward = reward
-        #print 'prev_reward: ' + str(prev_reward)
-        #print 'reward: ' + str(reward)
+    prev_reward = reward
     return action
 
 def updateQ(disc_cur_state):
@@ -170,6 +163,11 @@ def updateQ(disc_cur_state):
     global Q_dict
     global N_dict
     global prev_reward
+
+    try:
+        N_dict[disc_prev_state] += 1
+    except Exception:
+        N_dict[disc_prev_state] = 1
 
     #Go up
     go_up_state = disc_cur_state + (GO_UP,) #Equivalent to (s, a')
@@ -206,15 +204,11 @@ def updateQ(disc_cur_state):
 
     second_term = 1
     try:
-        second_term = prev_reward + discount_factor * max_utility - Q_dict[disc_prev_state]
+        second_term = prev_reward + (discount_factor * max_utility) - Q_dict[disc_prev_state]
         Q_dict[disc_prev_state] += learning_rate * second_term
     except Exception:
         second_term = prev_reward + discount_factor * max_utility
         Q_dict[disc_prev_state] = learning_rate * second_term
-
-# change this later
-def isTerminal(cur_state):
-    return False
 
 def playGame():
 
@@ -235,7 +229,7 @@ def playGame():
 
     next_action = 0
 
-    if game % 100 == 0:
+    if game % 1000 == 0:
         print game
 
     while True: #main game loop
@@ -252,8 +246,9 @@ def playGame():
         if(cont_cur_state.paddle_y + paddle_move < 0.8 and cont_cur_state.paddle_y + paddle_move > 0):
             cont_cur_state.paddle_y = cont_cur_state.paddle_y + paddle_move
 
-        disc_prev_state = deepcopy(disc_cur_state)
+        # this stuff might be wrong
         next_action = QLearningAgent(cont_cur_state)
+        disc_prev_state = deepcopy(disc_cur_state)
         disc_cur_state = cont_cur_state.getState() + (next_action, )   
 
         # if the paddle is hit, set the new ball velocities based on randomness
@@ -272,6 +267,7 @@ def playGame():
             cont_cur_state.v_x = (cont_cur_state.v_x + U) * -1
         else:
             if checkGameOver(cont_cur_state):
+                # look at this
                 updateQ(cont_cur_state.getState())
                 game += 1
                 break
@@ -281,18 +277,16 @@ def playGame():
 def main():
     #pygame.init()
     #playGraphicGame()
-    iterations = 1000
+    iterations = 10000
     for game in range(0,iterations):
         playGame()
-    bestPaddleHits = 0
     avgPaddleHits = 0
     for paddleHits in paddleHitList:
         avgPaddleHits += paddleHits
     print 'avg paddle hits: ' + str(float(avgPaddleHits)/iterations)
-    print 'best paddle hits: ' + str(bestPaddleHits)
 
-    for key in Q_dict:
-        print str(key) + ' = ' + str(Q_dict[key])
+    #for key in Q_dict:
+    #    print str(key) + ' = ' + str(Q_dict[key])
     #for key in N_dict:
     #    print str(key) + ' = ' + str(N_dict[key])
 
