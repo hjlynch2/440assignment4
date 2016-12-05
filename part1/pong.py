@@ -31,6 +31,11 @@ paddleHitList = []
 iters = []
 game = 0
 
+lr_const = 0
+discount_factor = 0
+NUMBER_EXPLORED_THRESHOLD = 0
+R_PLUS = 5
+
 #Global Variables to be used through our program
 
 WINDOWWIDTH = 400
@@ -237,14 +242,6 @@ def getReward(cur_state):
 def checkGameOver(cur_state):
     return cur_state.ball_x > 1
 
-##### Exploration Function #####
-NUMBER_EXPLORED_THRESHOLD = 200  #Ne in the lectures
-R_PLUS = 5 #R+ -> arbitrary value (modified utility)
-
-"""
-Return what action to take next
-Arguments: cur_state - tuple representing the current state
-"""
 def exploration_function(cur_state):
     global Q
     global N
@@ -299,6 +296,8 @@ def updateQ(cur_state):
     global Q
     global N
     global prev_reward
+    global lr_const
+    global discount_factor
 
     p_x = disc_prev_state[0]
     p_y = disc_prev_state[1]
@@ -321,14 +320,12 @@ def updateQ(cur_state):
 
     max_utility = max(up_utility, down_utility, nowhere_utility)
 
-    discount_factor = 0.5
-    lr_const = 20
     learning_rate = float(lr_const)/(lr_const + N[p_x][p_y][p_v_x][p_v_y][p_paddle_y][p_action])
 
     second_term = prev_reward + (discount_factor * max_utility) - Q[p_x][p_y][p_v_x][p_v_y][p_paddle_y][p_action]
     Q[p_x][p_y][p_v_x][p_v_y][p_paddle_y][p_action] += learning_rate * second_term
 
-def playGame():
+def playGame(lr, discount, threshold):
 
     global disc_cur_state
     global disc_prev_state 
@@ -336,6 +333,13 @@ def playGame():
     global game
     global iters
     global it
+    global lr_const
+    global discount_factor
+    global NUMBER_EXPLORED_THRESHOLD
+
+    lr_const = lr
+    discount_factor = discount
+    NUMBER_EXPLORED_THRESHOLD = threshold
 
     #Initiate variable and set starting positions
     #any future changes made within rectangles
@@ -394,26 +398,27 @@ def main():
     start = time.time()
     iterations = 100000
     avgPaddleHits = 0
-    for game in range(0,iterations):
-        playGame()
-        if game % 1000 == 0 and not game == 0 :
-            print game
-            for paddleHits in paddleHitList:
-                avgPaddleHits += paddleHits
-            print 'avg paddle hits: ' + str(float(avgPaddleHits)/game)
-            avgPaddleHits = 0
-    for paddleHits in paddleHitList:
-        avgPaddleHits += paddleHits
-    print 'avg paddle hits: ' + str(float(avgPaddleHits)/iterations)
-    print 'time taken: ' + str(time.time() - start)
-    print
-
-    avgPaddleHits = 0
-    for test in range(0,2000):
-        playGame()
-    for test in range(50000, 52000):
-        avgPaddleHits += paddleHitList[test]
-    print 'avg paddle hits test: ' + str(float(avgPaddleHits)/2000) 
+    for threshold in range(5, 150, 5):
+        for d in range(1, 10):
+            discount = d/10.0
+            for lr in range(5, threshold):
+                print 'learning rate const: ' + str(lr)
+                print 'discount factor: ' + str(discount)
+                print 'threshold: ' + str(threshold)
+                for game in range(0,iterations):
+                    playGame(lr, discount, threshold)
+                for paddleHits in paddleHitList:
+                    avgPaddleHits += paddleHits
+                print 'avg paddle hits: ' + str(float(avgPaddleHits)/iterations)
+                print 'time taken: ' + str(time.time() - start)
+                print
+                avgPaddleHits = 0
+                for test in range(0,2000):
+                    playGame()
+                for test in range(50000, 52000):
+                    avgPaddleHits += paddleHitList[test]
+                print 'avg paddle hits test: ' + str(float(avgPaddleHits)/2000) 
+                print 
 
     #pygame.init()
     #playGraphicGame()
