@@ -30,6 +30,11 @@ gameLengths = []
 paddleHitList = []
 game = 0
 
+lr_const = 0
+discount_factor = 0
+NUMBER_EXPLORED_THRESHOLD = 0  #Ne in the lectures
+R_PLUS = 5 #R+ -> arbitrary value (modified utility)
+
 #Global Variables to be used through our program
 
 WINDOWWIDTH = 400
@@ -82,9 +87,6 @@ def getReward(cur_state):
 def checkGameOver(cur_state):
     return cur_state.ball_x > 1 and not checkHit(cur_state)
 
-##### Exploration Function #####
-NUMBER_EXPLORED_THRESHOLD = 15  #Ne in the lectures
-R_PLUS = 5 #R+ -> arbitrary value (modified utility)
 
 """
 Return what action to take next
@@ -210,12 +212,19 @@ def updateQ(disc_cur_state):
         second_term = prev_reward + discount_factor * max_utility
         Q_dict[disc_prev_state] = learning_rate * second_term
 
-def playGame():
+def playGame(learning_rate_const, discount, threshold):
 
     global disc_cur_state
     global disc_prev_state 
     global prev_reward
     global game
+    global lr_const
+    global discount_factor
+    global NUMBER_EXPLORED_THRESHOLD
+
+    lr_const = learning_rate_const
+    discount_factor = discount
+    NUMBER_EXPLORED_THRESHOLD = threshold
 
     #Initiate variable and set starting positions
     #any future changes made within rectangles
@@ -272,22 +281,41 @@ def playGame():
 
 #Main function
 def main():
-    #pygame.init()
-    #playGraphicGame()
+    global paddleHitList
+    global game
     iterations = 100000
-    for game in range(0,iterations):
+    avgPaddleHits = 0
+
+    # training
+    lr = 18
+    discount = 0.7 
+    threshold = 10
+    print 'learning rate const: ' + str(lr)
+    print 'discount factor: ' + str(discount)
+    print 'threshold: ' + str(threshold)
+    paddleHitList = []
+    start = time.time()
+    for game in range(0, iterations):
         if game % 1000 == 0:
             print game
-        playGame()
-    avgPaddleHits = 0
+        playGame(lr, discount, threshold)
     for paddleHits in paddleHitList:
         avgPaddleHits += paddleHits
+    end = time.time()
     print 'avg paddle hits: ' + str(float(avgPaddleHits)/iterations)
+    print 'time taken: ' + str(end - start)
+    print
 
-    #for key in Q_dict:
-    #    print str(key) + ' = ' + str(Q_dict[key])
-    #for key in N_dict:
-    #    print str(key) + ' = ' + str(N_dict[key])
+    # testing
+    avgPaddleHits = 0
+    paddleHitList = []
+    testRuns = 2000
+    game = 0
+    for test in range(0,testRuns):
+        playGame(lr, discount, threshold)
+    for paddleHits in paddleHitList:
+        avgPaddleHits += paddleHits
+    print 'Test avg paddle hits: ' + str(float(avgPaddleHits)/testRuns) 
 
 if __name__=='__main__':
     main()
