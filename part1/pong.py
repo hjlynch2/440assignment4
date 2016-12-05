@@ -395,30 +395,42 @@ def playGame(lr, discount, threshold):
 
 #Main function
 def main():
-    start = time.time()
+    global paddleHitList
     iterations = 100000
     avgPaddleHits = 0
-    for threshold in range(5, 150, 5):
-        for d in range(1, 10):
+
+    for threshold in range(5, 150, 10):
+        for d in range(1, 10, 2):
             discount = d/10.0
-            for lr in range(5, threshold):
+            for lr in range(5, threshold, 10):
+                if lr == 5 and discount == 0.1 and threshold == 15:
+                    continue
+                # training
                 print 'learning rate const: ' + str(lr)
                 print 'discount factor: ' + str(discount)
                 print 'threshold: ' + str(threshold)
-                for game in range(0,iterations):
+                paddleHitList = []
+                start = time.time()
+                for game in range(0, iterations):
                     playGame(lr, discount, threshold)
                 for paddleHits in paddleHitList:
                     avgPaddleHits += paddleHits
+                end = time.time()
                 print 'avg paddle hits: ' + str(float(avgPaddleHits)/iterations)
-                print 'time taken: ' + str(time.time() - start)
+                print 'time taken: ' + str(end - start)
                 print
+
+                # testing
                 avgPaddleHits = 0
-                for test in range(0,2000):
-                    playGame()
-                for test in range(100000, 102000):
-                    avgPaddleHits += paddleHitList[test]
-                print 'avg paddle hits test: ' + str(float(avgPaddleHits)/2000) 
-                print 
+                paddleHitList = []
+                testRuns = 2000
+                for test in range(0,testRuns):
+                    playGame(lr, discount, threshold)
+                for paddleHits in paddleHitList:
+                    avgPaddleHits += paddleHits
+                print 'Test avg paddle hits: ' + str(float(avgPaddleHits)/testRuns) 
+                print
+
 
     #pygame.init()
     #playGraphicGame()
