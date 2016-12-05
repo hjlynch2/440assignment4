@@ -83,7 +83,7 @@ def checkGameOver(cur_state):
     return cur_state.ball_x > 1 and not checkHit(cur_state)
 
 ##### Exploration Function #####
-NUMBER_EXPLORED_THRESHOLD = 10  #Ne in the lectures
+NUMBER_EXPLORED_THRESHOLD = 15  #Ne in the lectures
 R_PLUS = 5 #R+ -> arbitrary value (modified utility)
 
 """
@@ -199,7 +199,7 @@ def updateQ(disc_cur_state):
     max_utility = max(up_utility, down_utility, nowhere_utility)
 
     discount_factor = 0.5
-    lr_const = 20
+    lr_const = 12
     learning_rate = float(lr_const)/(lr_const + N_dict[disc_prev_state])
 
     second_term = 1
@@ -229,9 +229,6 @@ def playGame():
 
     next_action = 0
 
-    if game % 1000 == 0:
-        print game
-
     while True: #main game loop
 
         paddle_move = 0
@@ -257,12 +254,12 @@ def playGame():
         if paddleHit:
             paddleHitList[game] += 1
             cont_cur_state.ball_x = 2 - cont_cur_state.ball_x
-            V = (random.random() * 0.03) - 0.015
-            while abs(cont_cur_state.ball_y + V) > 1: 
+            V = (random.random() * 0.06) - 0.03
+            while abs(cont_cur_state.v_y + V) > 1: 
                 V = (random.random() * 0.03) - 0.015
-            U = (random.random() * 0.06) - 0.03
-            while abs(cont_cur_state.ball_x * -1 + U) < 0.03 and abs(cont_cur_state.ball_x * -1 + U) > 1:
-                U = (random.random() * 0.03 ) - 0.03
+            U = (random.random() * 0.03) - 0.015
+            while abs(cont_cur_state.v_x + U) < 0.03 or abs(cont_cur_state.v_x * -1 + U) > 1:
+                U = (random.random() * 0.03 ) - 0.015
             cont_cur_state.v_y = cont_cur_state.v_y + V
             cont_cur_state.v_x = (cont_cur_state.v_x + U) * -1
         else:
@@ -277,8 +274,10 @@ def playGame():
 def main():
     #pygame.init()
     #playGraphicGame()
-    iterations = 10000
+    iterations = 100000
     for game in range(0,iterations):
+        if game % 1000 == 0:
+            print game
         playGame()
     avgPaddleHits = 0
     for paddleHits in paddleHitList:
