@@ -415,7 +415,7 @@ def main():
                 avgPaddleHits = 0
                 for test in range(0,2000):
                     playGame()
-                for test in range(50000, 52000):
+                for test in range(100000, 102000):
                     avgPaddleHits += paddleHitList[test]
                 print 'avg paddle hits test: ' + str(float(avgPaddleHits)/2000) 
                 print 
