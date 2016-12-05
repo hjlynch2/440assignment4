@@ -38,7 +38,11 @@ class state:
 	    return int(math.floor((self.paddle_y * 12)/(0.8)))
 
 	def getXState(self):
-	    return int(self.ball_x * 12)
+		if self.ball_x >= 1:
+			return 11
+		return int(self.ball_x * 12)
 
 	def getYState(self):
-	    return int(self.ball_y * 12)
+		if self.ball_y >= 1:
+			return 11
+		return int(self.ball_y * 12)
