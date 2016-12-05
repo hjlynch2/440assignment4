@@ -7,12 +7,12 @@
 '''
 
 import pygame, sys, random
-import math
-import time
 from random import randint
 from pygame.locals import *
 from state import state
 from copy import deepcopy
+import numpy as np
+import time
 
 # Number of frames per second
 # Change this value to speed up or slow down your game
@@ -28,6 +28,7 @@ disc_prev_state = None
 prev_reward = 0
 gameLengths = []
 paddleHitList = []
+iters = []
 game = 0
 
 #Global Variables to be used through our program
@@ -38,8 +39,12 @@ LINETHICKNESS = 10
 PADDLESIZE = WINDOWHEIGHT * .2
 PADDLEOFFSET = 0
 
-Q_dict = dict() #stores the Q values
-N_dict = dict() #stores the number of times visting state-action
+#Q_dict = dict() #stores the Q values
+#N_dict = dict() #stores the number of times visting state-action
+Q = np.ndarray((12,12,2,2,12,3))
+N = np.ndarray((12,12,2,2,12,3))
+Q.fill(0)
+N.fill(0)
 
 # Set up the colours
 BLACK     = (0  ,0  ,0  )
@@ -50,6 +55,164 @@ WHITE     = (255,255,255)
 FPSCLOCK = pygame.time.Clock()
 DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH,WINDOWHEIGHT)) 
 pygame.display.set_caption('Pong')
+
+'''
+def playGraphicGame():
+
+    global disc_cur_state
+    global disc_prev_state 
+    global prev_reward
+    global game
+    global DISPLAYSURF
+    global FPSCLOCK
+
+    #Initiate variable and set starting positions
+    #any future changes made within rectangles
+    ballX = WINDOWWIDTH/2 - LINETHICKNESS/2
+    ballY = WINDOWHEIGHT/2 - LINETHICKNESS/2
+    leftWallPosition = 0.0
+    paddlePosition = (WINDOWHEIGHT - PADDLESIZE) /2
+
+    # Keeps track of ball direction
+    # 1/FPS scalar to account for the FPS
+    ballDirX = 0.03 * WINDOWWIDTH
+    ballDirY = 0.01 * WINDOWHEIGHT
+
+    cont_cur_state = state(ballX, ballY, ballDirX, ballDirY, paddlePosition, True)
+    disc_cur_state = cont_cur_state.getState() + (GO_NOWHERE,)
+    disc_prev_state = None
+
+    paddleHitList.append(0)
+
+    next_action = 0
+
+    leftWall = pygame.Rect(PADDLEOFFSET, leftWallPosition, LINETHICKNESS, WINDOWHEIGHT)
+    paddle = pygame.Rect(WINDOWWIDTH - PADDLEOFFSET - LINETHICKNESS, paddlePosition, LINETHICKNESS, PADDLESIZE)
+    ball = pygame.Rect(ballX, ballY, LINETHICKNESS, LINETHICKNESS)
+
+    lines = getXYLines()
+
+    #Draws the starting position of the Arena
+    drawArena()
+    cont_cur_state = drawPaddle(paddle, cont_cur_state)
+    drawBall(ball, cont_cur_state)
+    drawLines(lines)
+
+    while True: #main game loop
+
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+
+        paddle_move = 0
+        if next_action == 1:
+            paddle_move = -0.04 * WINDOWHEIGHT
+        elif next_action == 2:
+            paddle_move = 0.04 * WINDOWHEIGHT
+
+        cont_cur_state.ball_x = cont_cur_state.ball_x + cont_cur_state.v_x
+        cont_cur_state.ball_y = cont_cur_state.ball_y + cont_cur_state.v_y
+
+        if(cont_cur_state.paddle_y + paddle_move < 0.8 * WINDOWHEIGHT and cont_cur_state.paddle_y + paddle_move > 0):
+            cont_cur_state.paddle_y = cont_cur_state.paddle_y + paddle_move
+
+        next_action = QLearningAgent(cont_cur_state)
+        disc_prev_state = deepcopy(disc_cur_state)
+        disc_cur_state = cont_cur_state.getState() + (next_action, )   
+
+        paddleHit = cont_cur_state.v_x > 0 and cont_cur_state.ball_x >= WINDOWWIDTH - LINETHICKNESS and cont_cur_state.ball_y >= cont_cur_state.paddle_y and cont_cur_state.ball_y <= cont_cur_state.paddle_y + PADDLESIZE
+
+        if paddleHit:
+            print 'paddle hit'
+            paddleHitList[game] += 1
+            cont_cur_state.ball_x = WINDOWWIDTH - abs(cont_cur_state.ball_x - WINDOWWIDTH)
+            V = (random.random() * 0.03 * WINDOWHEIGHT) - 0.015 * WINDOWWIDTH
+            U = (random.random() * 0.06 * WINDOWWIDTH) - 0.03 * WINDOWWIDTH
+            while abs(cont_cur_state.v_x + U) < 0.03 * WINDOWWIDTH:
+                U = (random.random() * 0.06 * WINDOWWIDTH) - 0.03 * WINDOWWIDTH
+            cont_cur_state.v_y = cont_cur_state.v_y + V
+            cont_cur_state.v_x = (cont_cur_state.v_x + U) * -1
+        else:
+            if cont_cur_state.ball_x > WINDOWWIDTH:
+                # look at this
+                updateQ(cont_cur_state.getState())
+                game += 1
+                break
+            cont_cur_state = checkEdgeCollision(cont_cur_state)
+
+        drawArena()
+        pygame.draw.rect(DISPLAYSURF, BLACK, leftWall)
+        cont_cur_state = drawPaddle(paddle, cont_cur_state)
+        drawBall(ball, cont_cur_state)
+        drawLines(lines)
+
+        pygame.display.update()
+        FPSCLOCK.tick(FPS)
+
+def getXYLines():
+    sizeOfState = WINDOWWIDTH / 12.0
+    curr_line = 0
+    lines = []
+    for i in range(0,11):
+        curr_line = curr_line + sizeOfState
+        lines.append(curr_line)
+    return lines
+
+#Checks for a collision with a wall, and 'bounces' ball off it.
+#Returns new direction
+def checkEdgeCollision(cur_state):
+    if cur_state.ball_y < LINETHICKNESS or cur_state.ball_y > (WINDOWHEIGHT - LINETHICKNESS):
+        if cur_state.ball_y < LINETHICKNESS:
+            cur_state.ball_y = 0
+        else: 
+            cur_state.ball_y = (WINDOWHEIGHT - 2 * LINETHICKNESS)
+        cur_state.v_y = cur_state.v_y * -1
+    if cur_state.ball_x < LINETHICKNESS:
+        cur_state.ball_x = LINETHICKNESS + (LINETHICKNESS - cur_state.ball_x)
+        cur_state.v_x = cur_state.v_x * -1
+    return cur_state
+
+#Draws the arena the game will be played in. 
+def drawArena():
+    DISPLAYSURF.fill(WHITE)
+
+#Draws the paddle
+def drawPaddle(paddle, cont_cur_state):
+    #Stops paddle moving too low
+    if cont_cur_state.paddle_y + PADDLESIZE >= WINDOWHEIGHT:
+        cont_cur_state.paddle_y = WINDOWHEIGHT - PADDLESIZE
+    #Stops paddle moving too high
+    elif cont_cur_state.paddle_y < 0:
+        cont_cur_state.paddle_y = 0
+    #Draws paddle
+    paddle.y = cont_cur_state.paddle_y
+    pygame.draw.rect(DISPLAYSURF, BLACK, paddle)
+    return cont_cur_state
+
+#draws the ball
+def drawBall(ball, cont_cur_state):
+    ball.y = cont_cur_state.ball_y
+    ball.x = cont_cur_state.ball_x
+    pygame.draw.rect(DISPLAYSURF, RED, ball)
+
+# draws separating lines
+def drawLines(lines):
+    # draw horizontal lines
+    for line in lines:
+        pygame.draw.line(DISPLAYSURF, BLACK, (0, line), (WINDOWWIDTH, line), 1)
+
+    # draw vertical lines
+    for line in lines:
+        pygame.draw.line(DISPLAYSURF, BLACK, (line, 0), (line, WINDOWHEIGHT), 1)
+
+# moves the ball, passes in new x and y position
+def moveBall(ball, ballX, ballY):
+    ball.x = ballX
+    ball.y = ballY
+    return ball
+
+'''
 
 # non graphical check
 def checkWallCollision(cur_state):
@@ -64,26 +227,18 @@ def checkWallCollision(cur_state):
         cur_state.v_y = cur_state.v_y * -1
     return cur_state
 
-# non graphical check
-def checkHit(cur_state):
-    paddle_bot = cur_state.paddle_y + 0.2
-    if cur_state.v_x > 0 and cur_state.ball_x >= 1 and cur_state.ball_y >= cur_state.paddle_y and cur_state.ball_y <= paddle_bot:
-        return True 
-    else: 
-        return False
-
 def getReward(cur_state):
-    if checkHit(cur_state):
+    if cur_state.v_x > 0 and cur_state.ball_x >= 1 and cur_state.ball_y >= cur_state.paddle_y and cur_state.ball_y <= cur_state.paddle_y + 0.2:
         return 1
     elif checkGameOver(cur_state):
         return -1
     return 0
 
 def checkGameOver(cur_state):
-    return cur_state.ball_x > 1 and not checkHit(cur_state)
+    return cur_state.ball_x > 1
 
 ##### Exploration Function #####
-NUMBER_EXPLORED_THRESHOLD = 10  #Ne in the lectures
+NUMBER_EXPLORED_THRESHOLD = 200  #Ne in the lectures
 R_PLUS = 5 #R+ -> arbitrary value (modified utility)
 
 """
@@ -91,44 +246,29 @@ Return what action to take next
 Arguments: cur_state - tuple representing the current state
 """
 def exploration_function(cur_state):
-    #Go up
-    go_up_state = cur_state + (GO_UP,) #Equivalent to (s, a')
-    num_visited_up = 0
+    global Q
+    global N
+
+    x = cur_state[0]
+    y = cur_state[1]
+    v_x = cur_state[2]
+    v_y = cur_state[3]
+    paddle_y = cur_state[4]
+
     up_utility = R_PLUS
-
-    try:
-        num_visited_up = N_dict[go_up_state]
-    except Exception:
-        num_visited_up = 0
-
+    num_visited_up = N[x][y][v_x][v_y][paddle_y][GO_UP]
     if num_visited_up >= NUMBER_EXPLORED_THRESHOLD:
-        up_utility = Q_dict[go_up_state] 
+        up_utility = Q[x][y][v_x][v_y][paddle_y][GO_UP]
 
-    #Go down
-    go_down_state = cur_state + (GO_DOWN,)
-    num_visited_down = 0
     down_utility = R_PLUS
-
-    try:
-        num_visited_down = N_dict[go_down_state]
-    except Exception:
-        num_visited_down = 0
-
+    num_visited_down = N[x][y][v_x][v_y][paddle_y][GO_DOWN]
     if num_visited_down >= NUMBER_EXPLORED_THRESHOLD:
-        down_utility = Q_dict[go_down_state] 
+        down_utility = Q[x][y][v_x][v_y][paddle_y][GO_DOWN]
 
-    #Do nothing
-    go_nowhere_state = cur_state + (GO_NOWHERE,)
-    num_visited_nowhere = 0
     nowhere_utility = R_PLUS
-
-    try:
-        num_visited_nowhere = N_dict[go_nowhere_state]
-    except Exception:
-        num_visited_nowhere = 0
-
+    num_visited_nowhere = N[x][y][v_x][v_y][paddle_y][GO_NOWHERE]
     if num_visited_nowhere >= NUMBER_EXPLORED_THRESHOLD:
-        nowhere_utility = Q_dict[go_nowhere_state]
+        nowhere_utility = Q[x][y][v_x][v_y][paddle_y][GO_NOWHERE]
 
     best_utility = max(up_utility, down_utility, nowhere_utility)
 
@@ -145,70 +285,48 @@ def exploration_function(cur_state):
 
 def QLearningAgent(cont_cur_state):
     global prev_reward
-    global N_dict
     cur_state = cont_cur_state.getState()
     action = exploration_function(cur_state)
     reward = 0
     if not disc_prev_state is None:
-        if checkGameOver(cont_cur_state):
-            reward  = -1
-        elif checkHit(cont_cur_state):
-            reward = 1
+        reward = getReward(cont_cur_state)
         updateQ(cur_state)
     prev_reward = reward
     return action
 
-def updateQ(disc_cur_state):
+def updateQ(cur_state):
     global disc_prev_state
-    global Q_dict
-    global N_dict
+    global Q
+    global N
     global prev_reward
 
-    try:
-        N_dict[disc_prev_state] += 1
-    except Exception:
-        N_dict[disc_prev_state] = 1
+    p_x = disc_prev_state[0]
+    p_y = disc_prev_state[1]
+    p_v_x = disc_prev_state[2]
+    p_v_y = disc_prev_state[3]
+    p_paddle_y = disc_prev_state[4]
+    p_action = disc_prev_state[5]
 
-    #Go up
-    go_up_state = disc_cur_state + (GO_UP,) #Equivalent to (s, a')
-    up_utility = 0
+    x = cur_state[0]
+    y = cur_state[1]
+    v_x = cur_state[2]
+    v_y = cur_state[3]
+    paddle_y = cur_state[4]
 
-    try:
-        up_utility = Q_dict[go_up_state] 
-    except Exception:
-        up_utility = 0
-
-    #Go down
-    go_down_state = disc_cur_state + (GO_DOWN,)
-    down_utility = 0
-
-    try:
-        down_utility = Q_dict[go_down_state] 
-    except Exception:
-        down_utility = 0
-
-    #Do nothing
-    go_nowhere_state = disc_cur_state + (GO_NOWHERE,)
-    nowhere_utility = 0
-
-    try:
-        nowhere_utility = Q_dict[go_nowhere_state] 
-    except Exception:
-        nowhere_utility = 0
+    N[p_x][p_y][p_v_x][p_v_y][p_paddle_y][p_action] += 1
+    
+    up_utility = Q[x][y][v_x][v_y][paddle_y][GO_UP]
+    down_utility = Q[x][y][v_x][v_y][paddle_y][GO_DOWN]
+    nowhere_utility = Q[x][y][v_x][v_y][paddle_y][GO_NOWHERE]
 
     max_utility = max(up_utility, down_utility, nowhere_utility)
 
     discount_factor = 0.5
     lr_const = 20
-    learning_rate = float(lr_const)/(lr_const + N_dict[disc_prev_state])
+    learning_rate = float(lr_const)/(lr_const + N[p_x][p_y][p_v_x][p_v_y][p_paddle_y][p_action])
 
-    second_term = 1
-    try:
-        second_term = prev_reward + (discount_factor * max_utility) - Q_dict[disc_prev_state]
-        Q_dict[disc_prev_state] += learning_rate * second_term
-    except Exception:
-        second_term = prev_reward + discount_factor * max_utility
-        Q_dict[disc_prev_state] = learning_rate * second_term
+    second_term = prev_reward + (discount_factor * max_utility) - Q[p_x][p_y][p_v_x][p_v_y][p_paddle_y][p_action]
+    Q[p_x][p_y][p_v_x][p_v_y][p_paddle_y][p_action] += learning_rate * second_term
 
 def playGame():
 
@@ -216,23 +334,25 @@ def playGame():
     global disc_prev_state 
     global prev_reward
     global game
+    global iters
+    global it
 
     #Initiate variable and set starting positions
     #any future changes made within rectangles
     paddle_height = 0.2 
 
-    cont_cur_state = state(0.5, 0.5, 0.03, 0.01, 0.5 - paddle_height/2)
-    disc_cur_state = cont_cur_state.getState()
+    cont_cur_state = state(0.5, 0.5, 0.03, 0.01, 0.5 - paddle_height/2, False)
+    disc_cur_state = cont_cur_state.getState() + (GO_NOWHERE,)
     disc_prev_state = None
 
     paddleHitList.append(0)
+    iters.append(0)
 
     next_action = 0
 
-    if game % 1000 == 0:
-        print game
+    while not checkGameOver(cont_cur_state): #main game loop
 
-    while True: #main game loop
+        iters[game] += 1
 
         paddle_move = 0
         if next_action == 1:
@@ -246,49 +366,57 @@ def playGame():
         if(cont_cur_state.paddle_y + paddle_move < 0.8 and cont_cur_state.paddle_y + paddle_move > 0):
             cont_cur_state.paddle_y = cont_cur_state.paddle_y + paddle_move
 
-        # this stuff might be wrong
         next_action = QLearningAgent(cont_cur_state)
         disc_prev_state = deepcopy(disc_cur_state)
         disc_cur_state = cont_cur_state.getState() + (next_action, )   
 
-        # if the paddle is hit, set the new ball velocities based on randomness
-        paddleHit = checkHit(cont_cur_state)
+        paddleHit = cont_cur_state.v_x > 0 and cont_cur_state.ball_x >= 1 and cont_cur_state.ball_y >= cont_cur_state.paddle_y and cont_cur_state.ball_y <= cont_cur_state.paddle_y + .2
 
         if paddleHit:
             paddleHitList[game] += 1
             cont_cur_state.ball_x = 2 - cont_cur_state.ball_x
-            V = (random.random() * 0.03) - 0.015
-            while abs(cont_cur_state.ball_y + V) > 1: 
+            V = (random.random() * 0.06) - 0.03
+            while abs(cont_cur_state.v_y + V) > 1: 
                 V = (random.random() * 0.03) - 0.015
-            U = (random.random() * 0.06) - 0.03
-            while abs(cont_cur_state.ball_x * -1 + U) < 0.03 and abs(cont_cur_state.ball_x * -1 + U) > 1:
-                U = (random.random() * 0.03 ) - 0.03
+            U = (random.random() * 0.03) - 0.015
+            while abs(cont_cur_state.v_x + U) < 0.03 or abs(cont_cur_state.ball_x + U) > 1:
+                U = (random.random() * 0.03) - 0.015
             cont_cur_state.v_y = cont_cur_state.v_y + V
             cont_cur_state.v_x = (cont_cur_state.v_x + U) * -1
         else:
-            if checkGameOver(cont_cur_state):
-                # look at this
-                updateQ(cont_cur_state.getState())
-                game += 1
-                break
             cont_cur_state = checkWallCollision(cont_cur_state)
+
+    updateQ(cont_cur_state.getState())
+    game += 1
 
 #Main function
 def main():
-    #pygame.init()
-    #playGraphicGame()
-    iterations = 10000
+    start = time.time()
+    iterations = 100000
+    avgPaddleHits = 0
     for game in range(0,iterations):
         playGame()
-    avgPaddleHits = 0
+        if game % 1000 == 0 and not game == 0 :
+            print game
+            for paddleHits in paddleHitList:
+                avgPaddleHits += paddleHits
+            print 'avg paddle hits: ' + str(float(avgPaddleHits)/game)
+            avgPaddleHits = 0
     for paddleHits in paddleHitList:
         avgPaddleHits += paddleHits
     print 'avg paddle hits: ' + str(float(avgPaddleHits)/iterations)
+    print 'time taken: ' + str(time.time() - start)
+    print
 
-    #for key in Q_dict:
-    #    print str(key) + ' = ' + str(Q_dict[key])
-    #for key in N_dict:
-    #    print str(key) + ' = ' + str(N_dict[key])
+    avgPaddleHits = 0
+    for test in range(0,2000):
+        playGame()
+    for test in range(50000, 52000):
+        avgPaddleHits += paddleHitList[test]
+    print 'avg paddle hits test: ' + str(float(avgPaddleHits)/2000) 
 
+    #pygame.init()
+    #playGraphicGame()
+    
 if __name__=='__main__':
     main()
