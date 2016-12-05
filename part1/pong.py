@@ -396,6 +396,7 @@ def playGame(lr, discount, threshold):
 #Main function
 def main():
     global paddleHitList
+    global game
     iterations = 100000
     avgPaddleHits = 0
 
@@ -406,13 +407,13 @@ def main():
                 if lr == 5 and discount == 0.1 and threshold == 15:
                     continue
                 # training
-                print 'learning rate const: ' + str(lr)
-                print 'discount factor: ' + str(discount)
-                print 'threshold: ' + str(threshold)
+                print 'learning rate const: ' + str(12)
+                print 'discount factor: ' + str(.6)
+                print 'threshold: ' + str(20)
                 paddleHitList = []
                 start = time.time()
                 for game in range(0, iterations):
-                    playGame(lr, discount, threshold)
+                    playGame(12, .6, 20)
                 for paddleHits in paddleHitList:
                     avgPaddleHits += paddleHits
                 end = time.time()
@@ -424,6 +425,7 @@ def main():
                 avgPaddleHits = 0
                 paddleHitList = []
                 testRuns = 2000
+                game = 0
                 for test in range(0,testRuns):
                     playGame(lr, discount, threshold)
                 for paddleHits in paddleHitList:
