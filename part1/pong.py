@@ -94,7 +94,7 @@ def playGraphicGame():
                 pygame.quit()
                 sys.exit()
 
-        pygame.image.save(DISPLAYSURF, 'frame' + i + '.jpg')
+        pygame.image.save(DISPLAYSURF, 'frame' + str(i) + '.jpg')
 
         graph_cur_state.ball_x = graph_cur_state.ball_x + graph_cur_state.v_x
         graph_cur_state.ball_y = graph_cur_state.ball_y + graph_cur_state.v_y
@@ -472,7 +472,7 @@ def playGame(learning_rate_const, discount, threshold):
 def main():
     global paddleHitList
     global game
-    iterations = 100000
+    iterations = 50000
     avgPaddleHits = 0
     initializeDicts()
 
