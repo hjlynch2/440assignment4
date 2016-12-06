@@ -90,11 +90,11 @@ def checkGameOver(cur_state):
 def initializeDicts():
     global Q_dict
     global N_dict
-    for bx in range(0,12):
-        for by in range(0,12):
+    for bx in range(0,15):
+        for by in range(0,15):
             for vx in [-1, 1]:
                 for vy in [-1, 0, 1]:
-                    for py in range(0,12):
+                    for py in range(0,15):
                         for action  in range(0,3):
                             cur = (bx, by, vx, vy, py, action)
                             Q_dict[cur] = 0
@@ -153,9 +153,10 @@ def QLearningAgent(cont_cur_state):
     reward = 0
     if not disc_prev_state is None:
         if checkGameOver(cont_cur_state):
-            reward  = -1
+            reward  = -2
         elif checkHit(cont_cur_state):
             reward = 1
+        N_dict[disc_prev_state] += 1
         updateQ(cur_state)
     prev_reward = reward
     return action
@@ -165,12 +166,6 @@ def updateQ(disc_cur_state):
     global Q_dict
     global N_dict
     global prev_reward
-
-    N_dict[disc_prev_state] += 1
-
-    up_utility = 0
-    down_utility = 0
-    nowhere_utility = 0
 
     #Go up
     go_up_state = disc_cur_state + (GO_UP,)
@@ -260,7 +255,7 @@ def playGame(learning_rate_const, discount, threshold):
 def main():
     global paddleHitList
     global game
-    iterations = 100000
+    iterations = 120000
     avgPaddleHits = 0
     initializeDicts()
 
