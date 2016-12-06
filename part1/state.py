@@ -40,9 +40,13 @@ class state:
 	def getXState(self):
 		if self.ball_x >= 1:
 			return 11
+		if self.ball_x < 0:
+			return 0
 		return int(self.ball_x * 12)
 
 	def getYState(self):
 		if self.ball_y >= 1:
 			return 11
+		if self.ball_y < 0:
+			return 0
 		return int(self.ball_y * 12)

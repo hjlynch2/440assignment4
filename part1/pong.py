@@ -87,48 +87,48 @@ def getReward(cur_state):
 def checkGameOver(cur_state):
     return cur_state.ball_x > 1 and not checkHit(cur_state)
 
+def initializeDicts():
+    global Q_dict
+    global N_dict
+    for bx in range(0,12):
+        for by in range(0,12):
+            for vx in [-1, 1]:
+                for vy in [-1, 0, 1]:
+                    for py in range(0,12):
+                        for action  in range(0,3):
+                            cur = (bx, by, vx, vy, py, action)
+                            Q_dict[cur] = 0
+                            N_dict[cur] = 0
+
 
 """
 Return what action to take next
 Arguments: cur_state - tuple representing the current state
 """
 def exploration_function(cur_state):
+    
+    num_visited_up = 0
+    num_visited_down = 0
+    num_visited_nowhere = 0
+    up_utility = R_PLUS
+    down_utility = R_PLUS
+    nowhere_utility = R_PLUS
+
     #Go up
     go_up_state = cur_state + (GO_UP,) #Equivalent to (s, a')
-    num_visited_up = 0
-    up_utility = R_PLUS
-
-    try:
-        num_visited_up = N_dict[go_up_state]
-    except Exception:
-        num_visited_up = 0
-
+    num_visited_up = N_dict[go_up_state]
     if num_visited_up >= NUMBER_EXPLORED_THRESHOLD:
         up_utility = Q_dict[go_up_state] 
 
     #Go down
     go_down_state = cur_state + (GO_DOWN,)
-    num_visited_down = 0
-    down_utility = R_PLUS
-
-    try:
-        num_visited_down = N_dict[go_down_state]
-    except Exception:
-        num_visited_down = 0
-
+    num_visited_down = N_dict[go_down_state]
     if num_visited_down >= NUMBER_EXPLORED_THRESHOLD:
         down_utility = Q_dict[go_down_state] 
 
     #Do nothing
     go_nowhere_state = cur_state + (GO_NOWHERE,)
-    num_visited_nowhere = 0
-    nowhere_utility = R_PLUS
-
-    try:
-        num_visited_nowhere = N_dict[go_nowhere_state]
-    except Exception:
-        num_visited_nowhere = 0
-
+    num_visited_nowhere = N_dict[go_nowhere_state]
     if num_visited_nowhere >= NUMBER_EXPLORED_THRESHOLD:
         nowhere_utility = Q_dict[go_nowhere_state]
 
@@ -166,51 +166,28 @@ def updateQ(disc_cur_state):
     global N_dict
     global prev_reward
 
-    try:
-        N_dict[disc_prev_state] += 1
-    except Exception:
-        N_dict[disc_prev_state] = 1
+    N_dict[disc_prev_state] += 1
+
+    up_utility = 0
+    down_utility = 0
+    nowhere_utility = 0
 
     #Go up
-    go_up_state = disc_cur_state + (GO_UP,) #Equivalent to (s, a')
-    up_utility = 0
-
-    try:
-        up_utility = Q_dict[go_up_state] 
-    except Exception:
-        up_utility = 0
+    go_up_state = disc_cur_state + (GO_UP,)
+    up_utility = Q_dict[go_up_state] 
 
     #Go down
     go_down_state = disc_cur_state + (GO_DOWN,)
-    down_utility = 0
-
-    try:
-        down_utility = Q_dict[go_down_state] 
-    except Exception:
-        down_utility = 0
+    down_utility = Q_dict[go_down_state] 
 
     #Do nothing
     go_nowhere_state = disc_cur_state + (GO_NOWHERE,)
-    nowhere_utility = 0
-
-    try:
-        nowhere_utility = Q_dict[go_nowhere_state] 
-    except Exception:
-        nowhere_utility = 0
+    nowhere_utility = Q_dict[go_nowhere_state]
 
     max_utility = max(up_utility, down_utility, nowhere_utility)
-
-    discount_factor = 0.5
-    lr_const = 12
     learning_rate = float(lr_const)/(lr_const + N_dict[disc_prev_state])
-
-    second_term = 1
-    try:
-        second_term = prev_reward + (discount_factor * max_utility) - Q_dict[disc_prev_state]
-        Q_dict[disc_prev_state] += learning_rate * second_term
-    except Exception:
-        second_term = prev_reward + discount_factor * max_utility
-        Q_dict[disc_prev_state] = learning_rate * second_term
+    second_term = prev_reward + (discount_factor * max_utility) - Q_dict[disc_prev_state]
+    Q_dict[disc_prev_state] += learning_rate * second_term
 
 def playGame(learning_rate_const, discount, threshold):
 
@@ -231,7 +208,7 @@ def playGame(learning_rate_const, discount, threshold):
     paddle_height = 0.2 
 
     cont_cur_state = state(0.5, 0.5, 0.03, 0.01, 0.5 - paddle_height/2)
-    disc_cur_state = cont_cur_state.getState()
+    disc_cur_state = cont_cur_state.getState() + (GO_NOWHERE,)
     disc_prev_state = None
 
     paddleHitList.append(0)
@@ -285,11 +262,12 @@ def main():
     global game
     iterations = 100000
     avgPaddleHits = 0
+    initializeDicts()
 
     # training
-    lr = 18
-    discount = 0.7 
-    threshold = 10
+    lr = 20
+    discount = 0.4
+    threshold = 20
     print 'learning rate const: ' + str(lr)
     print 'discount factor: ' + str(discount)
     print 'threshold: ' + str(threshold)
